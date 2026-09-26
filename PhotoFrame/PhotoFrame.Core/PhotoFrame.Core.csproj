@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<!--
+		Платформенно-независимая часть: разбор страницы альбома, обход папок, форматирование
+		названий камер, расписание ночного режима. Выделена в отдельную сборку именно чтобы
+		её можно было тестировать: само приложение собирается только под net10.0-android,
+		и обычный тестовый проект на него сослаться не может.
+	-->
+	<PropertyGroup>
+		<TargetFramework>net10.0</TargetFramework>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<RootNamespace>PhotoFrame</RootNamespace>
+	</PropertyGroup>
+
+</Project>

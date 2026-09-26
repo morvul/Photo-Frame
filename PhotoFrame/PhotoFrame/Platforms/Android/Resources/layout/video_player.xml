@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Два проигрывателя, а не один. Клип готовится на том, что сейчас невидим, и лишь
+    когда у него появился первый кадр, слои меняются местами перетеканием. При одном
+    проигрывателе смена клипа была видна: поверхность переставлялась под новый размер
+    кадра, и на переходе между вертикальным и горизонтальным мелькал мусор.
+
+    surface_type=texture_view обязателен: обычная поверхность (SurfaceView) рисуется
+    мимо иерархии видов, её нельзя ни притушить, ни наложить одну на другую —
+    а на этом и держится перетекание.
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+             xmlns:app="http://schemas.android.com/apk/res-auto"
+             android:layout_width="match_parent"
+             android:layout_height="match_parent">
+
+    <androidx.media3.ui.PlayerView
+        android:id="@+id/player_back"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:alpha="0"
+        android:background="@android:color/transparent"
+        app:surface_type="texture_view"
+        app:use_controller="false"
+        app:shutter_background_color="@android:color/transparent" />
+
+    <androidx.media3.ui.PlayerView
+        android:id="@+id/player_front"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:alpha="0"
+        android:background="@android:color/transparent"
+        app:surface_type="texture_view"
+        app:use_controller="false"
+        app:shutter_background_color="@android:color/transparent" />
+
+</FrameLayout>

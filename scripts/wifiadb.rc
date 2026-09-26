@@ -1,0 +1,6 @@
+# Поднимает adb поверх Wi-Fi при каждой загрузке рамки, чтобы не тянуть USB.
+# Ровно то же, что делает ручной "adb tcpip 5555", только на старте и от root.
+on property:sys.boot_completed=1
+    setprop service.adb.tcp.port 5555
+    stop adbd
+    start adbd

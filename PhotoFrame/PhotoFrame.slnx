@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="PhotoFrame/PhotoFrame.csproj" />
+  <Project Path="PhotoFrame.Core/PhotoFrame.Core.csproj" />
+  <Project Path="PhotoFrame.Core.Tests/PhotoFrame.Core.Tests.csproj" />
+</Solution>

@@ -1,0 +1,32 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="PhotoFrame.FileInfoPage"
+             Title="Сведения о файле"
+             BackgroundColor="#111111"
+             Shell.NavBarIsVisible="False">
+
+    <Grid RowDefinitions="Auto,*">
+
+        <Grid Grid.Row="0" ColumnDefinitions="Auto,*" Padding="24,18" BackgroundColor="#1E1E1E">
+            <Button Grid.Column="0"
+                    Text="← Назад"
+                    Clicked="OnBackClicked"
+                    BackgroundColor="Transparent"
+                    TextColor="#4FC3F7"
+                    FontSize="18"
+                    Padding="0" />
+            <Label Grid.Column="1"
+                   Text="Сведения о файле"
+                   TextColor="White"
+                   FontSize="22"
+                   FontAttributes="Bold"
+                   HorizontalOptions="Center"
+                   VerticalOptions="Center" />
+        </Grid>
+
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout x:Name="DetailsLayout" Padding="24,18" Spacing="0" />
+        </ScrollView>
+    </Grid>
+</ContentPage>

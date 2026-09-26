@@ -1,0 +1,534 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:PhotoFrame"
+             x:Class="PhotoFrame.MainPage"
+             BackgroundColor="Black"
+             Shell.NavBarIsVisible="False"
+             Shell.FlyoutBehavior="Disabled"
+             Shell.TabBarIsVisible="False">
+
+    <Grid>
+        <!--
+            Слайд-шоу в два слоя. Верхний проявляется поверх нижнего, и наоборот, —
+            так между кадрами не мелькает чёрный экран: пока новый снимок не готов,
+            на виду остаётся прежний. Кадры отдаются платформенному ImageView готовыми
+            (см. PhotoFrameDecoder), потому что Source в MAUI грузится асинхронно и
+            на это время гасит картинку — ровно то мигание, от которого и уходим.
+        -->
+        <Image x:Name="SlideshowImage"
+               Aspect="AspectFit"
+               HorizontalOptions="Fill"
+               VerticalOptions="Fill" />
+
+        <Image x:Name="SlideshowImageTop"
+               Aspect="AspectFit"
+               Opacity="0"
+               HorizontalOptions="Fill"
+               VerticalOptions="Fill" />
+
+        <!--
+            Проигрыватель виден всегда, а показывает ли он что-нибудь — решают его слои:
+            пустой он прозрачен, кадры проявляются и гаснут перетеканием. Скрывать его
+            через IsVisible нельзя: невидимый вид не рисует, и первого кадра не дождаться.
+        -->
+        <local:VideoPlayerView x:Name="VideoPlayer"
+                               InputTransparent="True"
+                               HorizontalOptions="Fill"
+                               VerticalOptions="Fill" />
+
+        <!--
+            Слой касаний. Одиночное касание показывает панель управления, двойное
+            переключает кадр: в левой половине — назад, в правой — вперёд.
+
+            Фон не Transparent, а #01000000: на Android полностью прозрачный layout
+            не участвует в hit-testing, и жесты до него не доходят.
+        -->
+        <Grid x:Name="TouchOverlay" BackgroundColor="#01000000">
+            <Grid.GestureRecognizers>
+                <TapGestureRecognizer NumberOfTapsRequired="2" Tapped="OnDoubleTapped" />
+                <TapGestureRecognizer Tapped="OnScreenTapped" />
+
+                <!--
+                    Взмах вверх и вниз подстраивает яркость прямо на кадре: днём —
+                    подсветку, ночью — насыщенность цифр. У рамки нет ни кнопок
+                    громкости, ни шторки, а подбирать такое значение удобнее глядя
+                    на сам экран, а не на ползунок в настройках.
+                -->
+                <SwipeGestureRecognizer Direction="Up" Swiped="OnSwipeUp" />
+                <SwipeGestureRecognizer Direction="Down" Swiped="OnSwipeDown" />
+            </Grid.GestureRecognizers>
+        </Grid>
+
+        <!--
+            Часы и дата. Метки с контуром собираются в code-behind: в XAML нет циклов,
+            а обводка — это девять копий текста со смещением.
+            Позиция меняется на каждом кадре, чтобы надпись не выжигалась в одном месте
+            и не мешала всё время одному и тому же углу снимка.
+        -->
+        <VerticalStackLayout x:Name="ClockOverlay" Spacing="0" InputTransparent="True">
+            <Grid x:Name="ClockTimeHost" InputTransparent="True" />
+            <Grid x:Name="ClockDateHost" InputTransparent="True" Margin="4,-8,0,0" />
+            <Grid x:Name="SensorHost" InputTransparent="True" Margin="4,4,0,0" />
+        </VerticalStackLayout>
+
+        <!--
+            Чем и когда снят кадр. Приколочено к левому нижнему углу, а не привязано
+            к часам: часы гуляют по углам, и подпись прыгала вместе с ними.
+        -->
+        <Grid x:Name="CaptureInfoHost"
+              InputTransparent="True"
+              HorizontalOptions="Start"
+              VerticalOptions="End"
+              Margin="26,0,0,14" />
+
+        <!--
+            Имя файла и какой кадр из скольких. Приколочено к правому нижнему углу —
+            напротив подписи о съёмке, чтобы надписи не сходились в одном месте.
+        -->
+        <Grid x:Name="PhotoCounterHost"
+              InputTransparent="True"
+              HorizontalOptions="End"
+              VerticalOptions="End"
+              Margin="0,0,26,14" />
+
+        <!--
+            Ночной режим: вместо слайд-шоу — крупные приглушённые часы на чёрном.
+            InputTransparent, чтобы касание всё так же доходило до слоя жестов ниже
+            и панель управления оставалась доступной.
+        -->
+        <Grid x:Name="NightOverlay"
+              IsVisible="False"
+              BackgroundColor="Black"
+              InputTransparent="True">
+            <!--
+                Резервный вариант: обычные метки. Их закрывает NightClockImage, как только
+                кадр с шахматной маской готов; если отрисовка почему-то не удалась,
+                часы всё равно видны.
+            -->
+            <VerticalStackLayout x:Name="NightFallbackClock"
+                                 VerticalOptions="Center" HorizontalOptions="Center"
+                                 Spacing="2" Opacity="0.32">
+                <Label x:Name="NightTimeLabel"
+                       TextColor="White"
+                       FontSize="200"
+                       FontAttributes="Bold"
+                       HorizontalTextAlignment="Center" />
+                <Label x:Name="NightDateLabel"
+                       TextColor="White"
+                       FontSize="30"
+                       HorizontalTextAlignment="Center"
+                       Margin="0,-24,0,0" />
+            </VerticalStackLayout>
+
+            <!--
+                Часы на весь экран: горит только каждый второй пиксель.
+
+                Слоёв два, и они меняются ролями на каждой минуте: новый кадр
+                выкладывается в свободный слой, и лишь потом гасится прежний. Одного
+                слоя не хватало — между заменой картинки и её отрисовкой оставался
+                кадр с пустым ImageView, то есть чёрный экран.
+
+                Смена минуты идёт перетеканием, как и смена снимков: мгновенная подмена
+                оставляла короткий тёмный блик, а под непрозрачным уходящим кадром
+                не видно, сколько времени новый добирается до экрана.
+            -->
+            <Image x:Name="NightClockBackImage"
+                   Aspect="Fill"
+                   HorizontalOptions="Fill"
+                   VerticalOptions="Fill"
+                   InputTransparent="True" />
+
+            <Image x:Name="NightClockFrontImage"
+                   Aspect="Fill"
+                   Opacity="0"
+                   HorizontalOptions="Fill"
+                   VerticalOptions="Fill"
+                   InputTransparent="True" />
+        </Grid>
+
+        <!--
+            Камера Home Assistant. Свой угол, а не внутри ControlPanel: та лежит у верхнего
+            края экрана, а кнопке место снизу слева. От подписи о съёмке отделена запасом
+            по высоте — обе появляются по одному касанию и не должны наезжать друг на друга.
+            Объявлена после ночного оверлея, чтобы быть видимой и ночью (живой поток камеры
+            не привязан к текущему кадру), и днём.
+        -->
+        <Grid x:Name="CameraButtonHost"
+              IsVisible="False"
+              HorizontalOptions="Start"
+              VerticalOptions="End"
+              Margin="20,0,0,56">
+            <Button x:Name="CameraViewButton"
+                    Text="📷"
+                    Clicked="OnCameraViewClicked"
+                    BackgroundColor="#80000000"
+                    TextColor="White"
+                    FontSize="22"
+                    WidthRequest="56"
+                    HeightRequest="56"
+                    CornerRadius="28" />
+        </Grid>
+
+        <!--
+            Ход загрузки клипа живого фото. Внизу кадра и без подписи: живое фото должно
+            выглядеть снимком, который просто ожил, и отметка по центру экрана этому
+            мешала бы. Но и молчать нельзя — клип едет с сервера пару секунд, а до тех
+            пор кадр ничем не отличается от обычного.
+        -->
+        <ProgressBar x:Name="MotionLoadingBar"
+                     IsVisible="False"
+                     InputTransparent="True"
+                     Progress="0"
+                     ProgressColor="#4FC3F7"
+                     BackgroundColor="#40FFFFFF"
+                     HeightRequest="4"
+                     WidthRequest="360"
+                     HorizontalOptions="Center"
+                     VerticalOptions="End"
+                     Margin="0,0,0,28" />
+
+        <!--
+            Отметка на кадре альбома, за которым стоит видео: сам клип забирается только
+            когда слайд показан, и без отметки было бы непонятно, чего мы ждём.
+        -->
+        <Border x:Name="AlbumVideoBadge"
+                IsVisible="False"
+                InputTransparent="True"
+                HorizontalOptions="Center"
+                VerticalOptions="Center"
+                Padding="20,12"
+                BackgroundColor="#90000000"
+                StrokeThickness="0">
+            <Border.StrokeShape>
+                <RoundRectangle CornerRadius="24" />
+            </Border.StrokeShape>
+
+            <VerticalStackLayout Spacing="8">
+                <Label x:Name="AlbumVideoBadgeLabel"
+                       TextColor="White"
+                       FontSize="20"
+                       HorizontalTextAlignment="Center" />
+
+                <!-- Ход загрузки: клип бывает и на сорок мегабайт, и ждать молча долго. -->
+                <ProgressBar x:Name="AlbumVideoProgressBar"
+                             Progress="0"
+                             ProgressColor="#4FC3F7"
+                             BackgroundColor="#40FFFFFF"
+                             HeightRequest="6"
+                             WidthRequest="320" />
+            </VerticalStackLayout>
+        </Border>
+
+        <!--
+            Управление видео. Кнопка воспроизведения по центру видна всегда, когда
+            текущий кадр — видео: иначе о возможности воспроизвести никто не догадается.
+            Повтор и звук — рядом, чтобы не прятать их в настройках.
+        -->
+        <VerticalStackLayout x:Name="VideoControls"
+                             IsVisible="False"
+                             HorizontalOptions="Center"
+                             VerticalOptions="Center"
+                             Spacing="18">
+
+            <Button x:Name="PlayPauseButton"
+                    Text="▶"
+                    Clicked="OnPlayPauseClicked"
+                    BackgroundColor="#80000000"
+                    TextColor="White"
+                    FontSize="46"
+                    WidthRequest="118"
+                    HeightRequest="118"
+                    CornerRadius="59"
+                    HorizontalOptions="Center" />
+
+            <!-- Позиция воспроизведения. Фон полупрозрачный, как у кнопок: поверх
+                 светлого кадра тонкая полоска иначе не читается. -->
+            <Border x:Name="VideoProgressPanel"
+                    HorizontalOptions="Center"
+                    Padding="18,12"
+                    BackgroundColor="#80000000"
+                    StrokeThickness="0">
+                <Border.StrokeShape>
+                    <RoundRectangle CornerRadius="12" />
+                </Border.StrokeShape>
+
+                <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="Auto,*,Auto"
+                      WidthRequest="520" RowSpacing="8" ColumnSpacing="12">
+                    <ProgressBar Grid.Row="0" Grid.ColumnSpan="3"
+                                 x:Name="VideoProgressBar"
+                                 Progress="0"
+                                 ProgressColor="#4FC3F7"
+                                 BackgroundColor="#40FFFFFF"
+                                 HeightRequest="6" />
+
+                    <Label Grid.Row="1" Grid.Column="0"
+                           x:Name="VideoPositionLabel"
+                           Text="0:00"
+                           TextColor="White"
+                           FontSize="14" />
+
+                    <Label Grid.Row="1" Grid.Column="2"
+                           x:Name="VideoDurationLabel"
+                           Text="0:00"
+                           TextColor="#C0C0C0"
+                           FontSize="14" />
+                </Grid>
+            </Border>
+
+            <HorizontalStackLayout HorizontalOptions="Center" Spacing="16">
+                <Button x:Name="RepeatButton"
+                        Text="🔁"
+                        Clicked="OnRepeatClicked"
+                        BackgroundColor="#80000000"
+                        TextColor="White"
+                        FontSize="24"
+                        WidthRequest="68"
+                        HeightRequest="68"
+                        CornerRadius="34" />
+
+                <Button x:Name="MuteButton"
+                        Text="🔇"
+                        Clicked="OnMuteClicked"
+                        BackgroundColor="#80000000"
+                        TextColor="White"
+                        FontSize="24"
+                        WidthRequest="68"
+                        HeightRequest="68"
+                        CornerRadius="34" />
+
+                <!-- Громкость устройства: своя доля проигрывателя упирается в системную,
+                     поэтому кнопки двигают именно её. -->
+                <Button x:Name="VolumeDownButton"
+                        Text="−"
+                        Clicked="OnVolumeDownClicked"
+                        BackgroundColor="#80000000"
+                        TextColor="White"
+                        FontSize="28"
+                        WidthRequest="68"
+                        HeightRequest="68"
+                        CornerRadius="34" />
+
+                <Label x:Name="VolumeLabel"
+                       TextColor="White"
+                       FontSize="18"
+                       WidthRequest="72"
+                       HorizontalTextAlignment="Center"
+                       VerticalOptions="Center" />
+
+                <Button x:Name="VolumeUpButton"
+                        Text="+"
+                        Clicked="OnVolumeUpClicked"
+                        BackgroundColor="#80000000"
+                        TextColor="White"
+                        FontSize="28"
+                        WidthRequest="68"
+                        HeightRequest="68"
+                        CornerRadius="34" />
+            </HorizontalStackLayout>
+        </VerticalStackLayout>
+
+        <!--
+            Панель управления. По умолчанию скрыта и появляется по касанию экрана:
+            обновление идёт само, кнопка нужна лишь чтобы не ждать очередной проверки.
+        -->
+        <Grid x:Name="ControlPanel"
+              VerticalOptions="Start"
+              ColumnDefinitions="Auto,*,Auto"
+              Padding="20,16"
+              ColumnSpacing="14">
+
+            <!--
+                Столбик у левого края: обновление, сведения о файле и «убрать». Значки,
+                а не надписи, — обновление и так идёт само, кнопка лишь избавляет
+                от ожидания очередной проверки.
+            -->
+            <VerticalStackLayout x:Name="PanelLeftButtons"
+                                 Grid.Column="0" Spacing="10" VerticalOptions="Start">
+                <Button x:Name="SyncButton"
+                        Text="🔄"
+                        Clicked="OnSyncClicked"
+                        BackgroundColor="#80000000"
+                        TextColor="White"
+                        FontSize="22"
+                        WidthRequest="56"
+                        HeightRequest="56"
+                        CornerRadius="28"
+                        HorizontalOptions="Start" />
+
+                <Button x:Name="FileInfoButton"
+                        Text="ℹ"
+                        Clicked="OnFileInfoClicked"
+                        BackgroundColor="#80000000"
+                        TextColor="White"
+                        FontSize="22"
+                        WidthRequest="56"
+                        HeightRequest="56"
+                        CornerRadius="28"
+                        HorizontalOptions="Start" />
+
+                <!--
+                    Повтор живого фото: кадр остаётся на экране и его секунда движения
+                    играется по кругу, пока кнопку не нажмут снова. Отдельная от повтора
+                    видео: там слайд — сам клип, здесь — снимок, и общий переключатель
+                    означал бы разное в двух случаях. Видна только на живом фото.
+                -->
+                <Button x:Name="MotionRepeatButton"
+                        Text="🔁"
+                        IsVisible="False"
+                        Clicked="OnMotionRepeatClicked"
+                        BackgroundColor="#80000000"
+                        TextColor="White"
+                        FontSize="22"
+                        WidthRequest="56"
+                        HeightRequest="56"
+                        CornerRadius="28"
+                        HorizontalOptions="Start" />
+
+                <!--
+                    Отвязать клип живого фото и оставить обычный снимок. Видна только
+                    на живом фото Immich — у альбома Google так удалённо не поправить.
+                    Подтверждение — тем же приёмом, что и у корзины ниже: действие
+                    необратимое (клип уходит в корзину сервера), и промах по кнопке
+                    не должен стоить его молча.
+                -->
+                <HorizontalStackLayout Spacing="12">
+                    <Button x:Name="DetachLiveButton"
+                            Text="✂"
+                            IsVisible="False"
+                            Clicked="OnDetachLiveClicked"
+                            BackgroundColor="#80000000"
+                            TextColor="White"
+                            FontSize="22"
+                            WidthRequest="56"
+                            HeightRequest="56"
+                            CornerRadius="28" />
+
+                    <Border x:Name="DetachConfirmPanel"
+                            IsVisible="False"
+                            Opacity="0"
+                            TranslationX="-44"
+                            Padding="10"
+                            BackgroundColor="#B0000000"
+                            StrokeThickness="0"
+                            VerticalOptions="Center">
+                        <Border.StrokeShape>
+                            <RoundRectangle CornerRadius="30" />
+                        </Border.StrokeShape>
+
+                        <HorizontalStackLayout Spacing="10">
+                            <Button Text="✔"
+                                    Clicked="OnConfirmDetachClicked"
+                                    BackgroundColor="#C62828"
+                                    TextColor="White"
+                                    FontSize="22"
+                                    WidthRequest="56"
+                                    HeightRequest="56"
+                                    CornerRadius="28" />
+
+                            <Button Text="✖"
+                                    Clicked="OnCancelDetachClicked"
+                                    BackgroundColor="#333333"
+                                    TextColor="White"
+                                    FontSize="22"
+                                    WidthRequest="56"
+                                    HeightRequest="56"
+                                    CornerRadius="28" />
+                        </HorizontalStackLayout>
+                    </Border>
+                </HorizontalStackLayout>
+
+                <!--
+                    Убрать кадр из показа. Подтверждение выезжает вправо от самой кнопки:
+                    системный диалог перекрывал снимок целиком, а спросить всё равно надо —
+                    промах по кнопке не должен стоить снимка.
+                -->
+                <HorizontalStackLayout Spacing="12">
+                    <Button x:Name="RemoveButton"
+                            Text="🗑"
+                            Clicked="OnRemoveClicked"
+                            BackgroundColor="#80000000"
+                            TextColor="White"
+                            FontSize="22"
+                            WidthRequest="56"
+                            HeightRequest="56"
+                            CornerRadius="28" />
+
+                    <Border x:Name="RemoveConfirmPanel"
+                            IsVisible="False"
+                            Opacity="0"
+                            TranslationX="-44"
+                            Padding="10"
+                            BackgroundColor="#B0000000"
+                            StrokeThickness="0"
+                            VerticalOptions="Center">
+                        <Border.StrokeShape>
+                            <RoundRectangle CornerRadius="30" />
+                        </Border.StrokeShape>
+
+                        <HorizontalStackLayout Spacing="10">
+                            <Button Text="✔"
+                                    Clicked="OnConfirmRemoveClicked"
+                                    BackgroundColor="#C62828"
+                                    TextColor="White"
+                                    FontSize="22"
+                                    WidthRequest="56"
+                                    HeightRequest="56"
+                                    CornerRadius="28" />
+
+                            <Button Text="✖"
+                                    Clicked="OnCancelRemoveClicked"
+                                    BackgroundColor="#333333"
+                                    TextColor="White"
+                                    FontSize="22"
+                                    WidthRequest="56"
+                                    HeightRequest="56"
+                                    CornerRadius="28" />
+                        </HorizontalStackLayout>
+                    </Border>
+                </HorizontalStackLayout>
+            </VerticalStackLayout>
+
+            <HorizontalStackLayout Grid.Column="2" Spacing="10" VerticalOptions="Start">
+                <Button x:Name="SettingsButton"
+                        Text="⚙"
+                        Clicked="OnSettingsClicked"
+                        BackgroundColor="#80000000"
+                        TextColor="White"
+                        FontSize="22"
+                        WidthRequest="56"
+                        HeightRequest="56"
+                        CornerRadius="28" />
+            </HorizontalStackLayout>
+        </Grid>
+
+        <!--
+            Всплывающее сообщение. Живёт отдельно от панели управления: о результате
+            обновления и об ошибках нужно узнавать, не касаясь экрана. Объявлено последним,
+            то есть лежит выше остальных слоёв.
+
+            Свой, а не системный Toast: у системного мелкий текст, который с дивана
+            не прочитать, да и сообщения здесь бывают длинными.
+        -->
+        <Border x:Name="ToastPanel"
+                IsVisible="False"
+                InputTransparent="True"
+                HorizontalOptions="Center"
+                VerticalOptions="End"
+                Margin="0,0,0,64"
+                Padding="22,14"
+                BackgroundColor="#B0000000"
+                StrokeThickness="0">
+            <Border.StrokeShape>
+                <RoundRectangle CornerRadius="14" />
+            </Border.StrokeShape>
+
+            <Label x:Name="ToastLabel"
+                   TextColor="White"
+                   FontSize="18"
+                   LineBreakMode="WordWrap"
+                   MaximumWidthRequest="900"
+                   HorizontalTextAlignment="Center" />
+        </Border>
+    </Grid>
+</ContentPage>

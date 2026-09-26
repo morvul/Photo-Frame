@@ -1,0 +1,72 @@
+# ==========================================
+# .NET / Visual Studio Source Code Control
+# ==========================================
+*.user
+*.userosscache
+*.sln.docstates
+*.suo
+launchSettings.json
+
+# Папки компиляции (Самый важный пункт для MAUI)
+[Db]in/
+[Oo]bj/
+
+# Скрытая папка настроек Visual Studio
+.vs/
+
+# Кэш инструментов сборки MSBuild
+.msbuild/
+.tools/
+
+# ==========================================
+# .NET MAUI / Xamarin Specifics
+# ==========================================
+# Логи сборки Android устройств и эмуляторов
+*.apk
+*.aab
+*.dex
+*.pro
+*.nativecodeanalyses.xml
+
+# Артефакты сборки Apple iOS / Mac (на будущее)
+*.app
+*.ipa
+*.Xresources
+*.mshc
+ .DS_Store
+
+# ==========================================
+# Безопасность и Секреты (Google API Ключи)
+# ==========================================
+# Защита от случайной отправки учётных данных Google.
+# Точечные шаблоны вместо прежнего "*.json": тот блокировал вообще любой JSON,
+# включая нужные файлы проекта, а правило "!AndroidManifest.xml" ничего не исправляло,
+# потому что манифест — это XML, а не JSON.
+client_secret*.json
+google-services.json
+
+# Локальные учётные данные сборки: путь/значения OAuth и id альбома.
+# Шаблон secrets.props.template отслеживается, сам secrets.props — нет.
+secrets.props
+*.keystore
+*.jks
+*.p12
+*.pem
+secrets.xml
+appsettings.json
+appsettings.Development.json
+
+# Локальная конфигурация прямой IP-камеры (RTSP-адрес с паролем): кладётся на рамку
+# файлом рядом с журналами, в репозиторий попадать не должна.
+camera_rtsp.txt
+camera_rtsp_name.txt
+
+# ==========================================
+# JetBrains Rider & VS Code (Если используются)
+# ==========================================
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln.iml

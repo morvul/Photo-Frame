@@ -1,0 +1,30 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+	<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+	<uses-permission android:name="android.permission.INTERNET" />
+
+	<!-- Открыть слайд-шоу после включения рамки; сам запуск включается в настройках. -->
+	<uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+	<!-- Остановить фоновый процесс Frameo при своём запуске: он переставляет часовой пояс. -->
+	<uses-permission android:name="android.permission.KILL_BACKGROUND_PROCESSES" />
+
+	<!-- Чтение папок со снимками. На Android 8.1 (API 27) действует READ_EXTERNAL_STORAGE,
+	     на API 33+ его заменяет READ_MEDIA_IMAGES — объявляем оба, чтобы APK работал и там. -->
+	<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+	<uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+
+	<!-- Запись нужна одной кнопке: «Убрать» переносит файл в папку Trash в общей памяти.
+	     На API 33+ разрешение больше не выдаётся, но и не требуется для своего каталога. -->
+	<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+
+	<!--
+		Активности здесь НЕ объявляются вручную. Атрибут [Activity] в MainActivity.cs
+		генерирует Java-класс со скрамблированным именем (crc64...MainActivity), поэтому
+		ручная запись <activity android:name=".MainActivity"> указывала на класс, которого
+		нет в APK: две иконки в лаунчере и падение с ClassNotFoundException.
+		OAuth-редирект теперь ловит WebAuthenticationCallbackActivity через [IntentFilter].
+	-->
+	<application android:allowBackup="true" android:icon="@mipmap/appicon" android:roundIcon="@mipmap/appicon_round" android:supportsRtl="true" />
+
+</manifest>

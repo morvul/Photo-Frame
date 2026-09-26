@@ -1,0 +1,103 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:PhotoFrame"
+             x:Class="PhotoFrame.FolderPickerPage"
+             Title="Выбор папок"
+             BackgroundColor="#111111"
+             Shell.NavBarIsVisible="False">
+
+    <Grid RowDefinitions="Auto,Auto,*,Auto">
+
+        <!-- Заголовок -->
+        <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" Padding="24,18" BackgroundColor="#1E1E1E">
+            <Button Grid.Column="0"
+                    Text="↑ Вверх"
+                    Clicked="OnGoUpClicked"
+                    BackgroundColor="Transparent"
+                    TextColor="#4FC3F7"
+                    FontSize="18"
+                    Padding="0" />
+
+            <Label Grid.Column="1"
+                   Text="Выбор папок"
+                   TextColor="White"
+                   FontSize="22"
+                   FontAttributes="Bold"
+                   HorizontalOptions="Center"
+                   VerticalOptions="Center" />
+
+            <Button Grid.Column="2"
+                    Text="Готово"
+                    Clicked="OnDoneClicked"
+                    BackgroundColor="Transparent"
+                    TextColor="#4FC3F7"
+                    FontSize="18"
+                    FontAttributes="Bold"
+                    Padding="0" />
+        </Grid>
+
+        <!-- Текущий путь и кнопка добавления самой этой папки -->
+        <Grid Grid.Row="1" ColumnDefinitions="*,Auto" Padding="24,14" ColumnSpacing="16"
+              BackgroundColor="#181818">
+            <VerticalStackLayout Grid.Column="0" Spacing="2">
+                <Label x:Name="CurrentPathLabel"
+                       TextColor="White" FontSize="15" LineBreakMode="TailTruncation" />
+                <Label x:Name="CurrentFolderInfoLabel"
+                       TextColor="Gray" FontSize="13" />
+            </VerticalStackLayout>
+
+            <Button Grid.Column="1"
+                    x:Name="AddCurrentFolderButton"
+                    Text="Добавить эту папку"
+                    Clicked="OnAddCurrentFolderClicked"
+                    BackgroundColor="#333333"
+                    TextColor="White"
+                    Padding="16,10"
+                    CornerRadius="8" />
+        </Grid>
+
+        <!-- Список вложенных папок -->
+        <CollectionView Grid.Row="2"
+                        x:Name="FolderList"
+                        SelectionMode="Single"
+                        SelectionChanged="OnFolderSelected"
+                        Margin="0,4,0,0">
+            <CollectionView.EmptyView>
+                <Label Text="Здесь нет вложенных папок"
+                       TextColor="Gray" FontSize="15"
+                       HorizontalOptions="Center" Margin="0,40,0,0" />
+            </CollectionView.EmptyView>
+
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="local:FolderEntry">
+                    <Grid ColumnDefinitions="*,Auto" Padding="24,14" ColumnSpacing="16">
+                        <VerticalStackLayout Grid.Column="0" Spacing="2">
+                            <Label Text="{Binding DisplayName}" TextColor="White" FontSize="17" />
+                            <Label Text="{Binding ImageCountText}" TextColor="Gray" FontSize="13" />
+                        </VerticalStackLayout>
+
+                        <Button Grid.Column="1"
+                                Text="{Binding SelectionGlyph}"
+                                BackgroundColor="{Binding SelectionColor}"
+                                Clicked="OnToggleFolderClicked"
+                                CommandParameter="{Binding .}"
+                                TextColor="Black"
+                                FontAttributes="Bold"
+                                FontSize="20"
+                                WidthRequest="54"
+                                HeightRequest="54"
+                                CornerRadius="27" />
+                    </Grid>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+
+        <!-- Что уже выбрано -->
+        <VerticalStackLayout Grid.Row="3" Padding="24,14" Spacing="4" BackgroundColor="#1E1E1E">
+            <Label x:Name="SelectionSummaryLabel" TextColor="White" FontSize="15" />
+            <Label x:Name="SelectionDetailLabel" TextColor="Gray" FontSize="13"
+                   LineBreakMode="TailTruncation" MaxLines="3" />
+        </VerticalStackLayout>
+    </Grid>
+</ContentPage>

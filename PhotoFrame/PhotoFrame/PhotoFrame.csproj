@@ -1,0 +1,126 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<!--
+		Локальные настройки: client id, client secret, id альбома.
+		secrets.props лежит в .gitignore и в репозиторий не попадает; шаблон —
+		secrets.props.template. Сборка без него проходит, но приложение сообщит,
+		что не настроено. См. README.
+	-->
+	<Import Project="$(MSBuildThisFileDirectory)secrets.props" Condition="Exists('$(MSBuildThisFileDirectory)secrets.props')" />
+
+	<PropertyGroup>
+		<!-- 1. CRITICAL: We isolate the target strictly to Android to completely stop iOS/Windows build tasks -->
+		<TargetFrameworks>net10.0-android</TargetFrameworks>
+
+		<OutputType>Exe</OutputType>
+		<RootNamespace>PhotoFrame</RootNamespace>
+		<UseMaui>true</UseMaui>
+		<SingleProject>true</SingleProject>
+		<ImplicitUsings>enable</ImplicitUsings>
+
+		<MauiXamlInflator>SourceGen</MauiXamlInflator>
+		<Nullable>enable</Nullable>
+
+		<!-- Display name -->
+		<ApplicationTitle>PhotoFrame</ApplicationTitle>
+
+		<!-- Your customized unique App Identifier -->
+		<ApplicationId>com.morvul.photoframe</ApplicationId>
+
+		<!-- Versions -->
+		<ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+		<ApplicationVersion>1</ApplicationVersion>
+
+		<!-- 2. CRITICAL: We override the min SDK to match your Frameo frame's Android 8.1 architecture -->
+		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">27.0</SupportedOSPlatformVersion>
+
+		<!--
+			NU1608: Media3 тянет свои версии AndroidX, а MAUI — свои, и NuGet сообщает о каждом
+			расхождении по два раза. Сборка рабочая, а из-за двадцати одинаковых предупреждений
+			не видно настоящих.
+		-->
+		<NoWarn>$(NoWarn);NU1608</NoWarn>
+	</PropertyGroup>
+
+	<!--
+		3. CRITICAL: 32-битный ARM нужно указывать явно — по умолчанию .NET Android
+		собирает "android-arm64;android-x64", и такой APK на рамку не встанет.
+		Целевая рамка (Rockchip, Android 8.1) сообщает abilist = "armeabi-v7a,armeabi",
+		то есть 64-битного слоя у неё нет вовсе, и android-arm64 был бы мёртвым грузом
+		(~11 МБ в APK плюс лишний проход AOT). Проверено на устройстве:
+		adb shell getprop ro.product.cpu.abilist
+
+		Пакеты armeabi-v7a существуют только для MonoVM: для CoreCLR и NativeAOT
+		пакета android-arm нет, поэтому UseMonoRuntime=false и PublishAot=true
+		для этого устройства ставить нельзя.
+	-->
+	<PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
+		<RuntimeIdentifiers>android-arm</RuntimeIdentifiers>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<!-- App Icon: фоторамка на тёмном фоне вместо шаблонного знака .NET -->
+		<MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.svg" Color="#22303C" />
+
+		<!-- Splash Screen: тот же знак, тот же фон -->
+		<MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#22303C" BaseSize="128,128" />
+
+		<!-- Custom Fonts -->
+		<MauiFont Include="Resources\Fonts\*" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<!--
+			Pinned rather than floating (10.0.*): the Microsoft.Maui.Controls package version must
+			stay aligned with the installed MAUI workload band, and a float makes builds
+			non-reproducible across machines.
+		-->
+		<PackageReference Include="Microsoft.Maui.Controls" Version="10.0.90" />
+		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.10" />
+		<PackageReference Include="Xamarin.AndroidX.Media3.ExoPlayer" Version="1.10.1.1" />
+		<!--
+			Ядро ExoPlayer грузит фабрику источника по типу контента через reflection,
+			и для HLS (плейлист камеры Home Assistant) ей нужен отдельный от ядра модуль —
+			без него Class.forName валится ClassNotFoundException прямо в рантайме.
+		-->
+		<PackageReference Include="Xamarin.AndroidX.Media3.ExoPlayer.Hls" Version="1.10.1.1" />
+		<!--
+			Прямой RTSP-источник IP-камеры: минует перекодировку Home Assistant, которая
+			на нестабильной камере и рвётся. DefaultMediaSourceFactory сам выбирает
+			RtspMediaSource для адресов rtsp://, если модуль в рантайме.
+		-->
+		<PackageReference Include="Xamarin.AndroidX.Media3.ExoPlayer.Rtsp" Version="1.10.1.1" />
+		<PackageReference Include="Xamarin.AndroidX.Media3.Ui" Version="1.10.1.1" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<!-- Платформенно-независимая логика, покрытая тестами. -->
+		<ProjectReference Include="..\PhotoFrame.Core\PhotoFrame.Core.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<!-- Шаблон не компилируется, но должен быть виден в обозревателе решений. -->
+		<None Include="secrets.props.template" />
+	</ItemGroup>
+
+	<!--
+		Генерирует класс с локальными настройками из secrets.props прямо в obj/.
+		Ссылка на альбом таким образом существует только в secrets.props (в .gitignore)
+		и в промежуточных артефактах сборки — в отслеживаемых файлах её нет вообще.
+	-->
+	<Target Name="GenerateLocalConfig" BeforeTargets="BeforeCompile">
+		<PropertyGroup>
+			<_GeneratedSecretsFile>$(IntermediateOutputPath)LocalConfig.g.cs</_GeneratedSecretsFile>
+		</PropertyGroup>
+
+		<Warning Condition="'$(GooglePhotosShareUrl)' == ''" Text="secrets.props отсутствует или не заполнен: сборка пройдёт, но рамка сообщит, что ссылка на альбом не задана. Скопируйте secrets.props.template в secrets.props." />
+
+		<WriteLinesToFile File="$(_GeneratedSecretsFile)" Overwrite="true" WriteOnlyWhenDifferent="true" Lines="// &lt;auto-generated /&gt; Сгенерировано из secrets.props. Не редактировать и не коммитить.;namespace PhotoFrame;{;    internal static class LocalConfig;    {;        public const string SharedAlbumUrl = &quot;$(GooglePhotosShareUrl)&quot;%3B;    };}" />
+
+		<ItemGroup>
+			<Compile Include="$(_GeneratedSecretsFile)" />
+			<FileWrites Include="$(_GeneratedSecretsFile)" />
+		</ItemGroup>
+	</Target>
+
+</Project>

@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:PhotoFrame"
+             x:Class="PhotoFrame.CameraViewPage"
+             Title="Камера"
+             BackgroundColor="Black"
+             Shell.NavBarIsVisible="False">
+
+    <Grid RowDefinitions="Auto,*">
+
+        <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" Padding="24,18" BackgroundColor="#1E1E1E">
+            <Button Grid.Column="0"
+                    Text="← Назад"
+                    Clicked="OnBackClicked"
+                    BackgroundColor="Transparent"
+                    TextColor="#4FC3F7"
+                    FontSize="18"
+                    Padding="0" />
+            <Label x:Name="HeaderLabel"
+                   Grid.Column="1"
+                   Text="Камера"
+                   TextColor="White"
+                   FontSize="22"
+                   FontAttributes="Bold"
+                   LineBreakMode="TailTruncation"
+                   HorizontalOptions="Center"
+                   VerticalOptions="Center" />
+
+            <!-- Видна, только если камер больше одной: переключаться не на что. -->
+            <Button x:Name="NextCameraButton"
+                    Grid.Column="2"
+                    IsVisible="False"
+                    Text="След. камера →"
+                    Clicked="OnNextCameraClicked"
+                    BackgroundColor="Transparent"
+                    TextColor="#4FC3F7"
+                    FontSize="18"
+                    Padding="0" />
+        </Grid>
+
+        <Grid Grid.Row="1" BackgroundColor="Black">
+            <!--
+                SnapshotImage несёт либо живые кадры MJPEG (см. RunMjpegStreamAsync —
+                подмена без перехода, кадры и так сменяют друг друга часто), либо, если
+                поток не открылся, резервные снимки по таймеру. SnapshotImageTop нужен
+                только резерву: новый снимок приходит на скрытый слой и проступает
+                поверх старого, а не подменяет картинку скачком (см. ShowSnapshotAsync).
+            -->
+            <Image x:Name="SnapshotImage"
+                   IsVisible="False"
+                   Opacity="0"
+                   Aspect="AspectFit"
+                   HorizontalOptions="Fill"
+                   VerticalOptions="Fill" />
+            <Image x:Name="SnapshotImageTop"
+                   IsVisible="False"
+                   Opacity="0"
+                   Aspect="AspectFit"
+                   HorizontalOptions="Fill"
+                   VerticalOptions="Fill" />
+
+            <!--
+                Живой HLS-поток камеры (frontend_stream_type = "hls"). Проигрывается
+                тем же ExoPlayer, что и локальные клипы, но по сети: страница указывает
+                адрес плейлиста из camera/stream. Виден, только когда камера отдаёт HLS.
+                Слои снимка при этом скрыты, а при обрыве потока страница уходит на резерв.
+            -->
+            <local:VideoPlayerView x:Name="LiveVideoPlayer"
+                                   IsVisible="False"
+                                   HorizontalOptions="Fill"
+                                   VerticalOptions="Fill" />
+
+            <!-- Пока поток не открылся или камера недоступна — сюда пишется, что происходит. -->
+            <Label x:Name="StatusLabel"
+                   TextColor="White"
+                   FontSize="18"
+                   HorizontalOptions="Center"
+                   VerticalOptions="Center"
+                   HorizontalTextAlignment="Center"
+                   LineBreakMode="WordWrap"
+                   MaximumWidthRequest="600" />
+        </Grid>
+    </Grid>
+</ContentPage>

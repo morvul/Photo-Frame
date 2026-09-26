@@ -1,0 +1,831 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="PhotoFrame.SettingsPage"
+             Title="Настройки"
+             BackgroundColor="#111111"
+             Shell.NavBarIsVisible="False">
+
+    <!--
+        Разделы свёрнуты и раскрываются по нажатию на заголовок: настроек стало столько,
+        что список перестал помещаться на экран и нужное приходилось выискивать прокруткой.
+        Свой заголовок, а не Expander: тот живёт в CommunityToolkit, а тянуть
+        зависимость в 32-битную сборку ради десяти заголовков не стоит. И не Button:
+        у кнопки MAUI не настраивается выравнивание текста, поэтому подпись раздела
+        оставалась по центру.
+
+        Под каждой подписью идёт вторая строка — что внутри раздела. Разделы названы
+        по тому, что в них лежит, а не по источнику настройки: яркость и размер кадра
+        стоят в «Экране», а не в слайд-шоу, и камеры — в «Камерах», а не в «Датчиках».
+    -->
+    <Grid RowDefinitions="Auto,*,Auto">
+
+        <!-- Заголовок -->
+        <Grid Grid.Row="0" ColumnDefinitions="Auto,*" Padding="24,18" BackgroundColor="#1E1E1E">
+            <Button Grid.Column="0"
+                    Text="← Назад"
+                    Clicked="OnBackClicked"
+                    BackgroundColor="Transparent"
+                    TextColor="#4FC3F7"
+                    FontSize="18"
+                    Padding="0" />
+            <Label Grid.Column="1"
+                   Text="Настройки рамки"
+                   TextColor="White"
+                   FontSize="22"
+                   FontAttributes="Bold"
+                   HorizontalOptions="Center"
+                   VerticalOptions="Center" />
+        </Grid>
+
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout Padding="24,20" Spacing="10">
+
+                <!-- ================= Источники снимков ================= -->
+                <Border BackgroundColor="#1E1E1E" StrokeThickness="0" Padding="16,12">
+                    <Border.StrokeShape>
+                        <RoundRectangle CornerRadius="8" />
+                    </Border.StrokeShape>
+                    <Border.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnSectionHeaderTapped"
+                                              CommandParameter="{x:Reference SourceSection}" />
+                    </Border.GestureRecognizers>
+                    <VerticalStackLayout Spacing="2">
+                        <Label Text="▸  ИСТОЧНИКИ СНИМКОВ"
+                               TextColor="#4FC3F7"
+                               FontSize="14"
+                               FontAttributes="Bold"
+                               CharacterSpacing="2"
+                               HorizontalOptions="Start" />
+                        <Label Text="Google Photos, Immich и папки на устройстве"
+                               TextColor="Gray" FontSize="12" HorizontalOptions="Start" />
+                    </VerticalStackLayout>
+                </Border>
+
+                <VerticalStackLayout x:Name="SourceSection" IsVisible="False"
+                                     Spacing="20" Margin="8,6,0,10">
+
+                    <Label Text="Источники независимы: можно включить несколько — кадры пойдут вперемежку в одном слайд-шоу."
+                           TextColor="Gray" FontSize="13" />
+
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Label Grid.Column="0" Text="Google Photos (общий альбом)"
+                               TextColor="White" FontSize="16" VerticalOptions="Center" />
+                        <Switch Grid.Column="1" x:Name="UseSharedAlbumSwitch"
+                                Toggled="OnSourceToggled"
+                                OnColor="#4FC3F7" VerticalOptions="Center" />
+                    </Grid>
+
+                    <!-- Настройки общего альбома -->
+                    <VerticalStackLayout x:Name="SharedAlbumPanel" Spacing="8" Margin="16,0,0,0">
+                        <Label Text="Ссылка на общий альбом Google Photos"
+                               TextColor="White" FontSize="16" />
+                        <Label Text="Google Photos → альбом → Поделиться → Создать ссылку"
+                               TextColor="Gray" FontSize="13" />
+                        <Entry x:Name="ShareUrlEntry"
+                               Placeholder="https://photos.app.goo.gl/..."
+                               PlaceholderColor="#555555"
+                               TextColor="White"
+                               BackgroundColor="#1E1E1E"
+                               FontSize="15"
+                               HeightRequest="52" />
+
+                        <Grid ColumnDefinitions="*,190" Margin="0,6,0,0">
+                            <VerticalStackLayout Grid.Column="0">
+                                <Label Text="Скачивать не больше" TextColor="White" FontSize="16" />
+                                <Label Text="Каждый кадр из альбома — это загрузка и место на диске. Папки на устройстве не ограничены."
+                                       TextColor="Gray" FontSize="13" />
+                            </VerticalStackLayout>
+                            <Picker Grid.Column="1" x:Name="AlbumLimitPicker"
+                                    TextColor="White" TitleColor="Gray" BackgroundColor="#1E1E1E"
+                                    VerticalOptions="Center" />
+                        </Grid>
+                    </VerticalStackLayout>
+
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Label Grid.Column="0" Text="Immich (свой сервер)"
+                               TextColor="White" FontSize="16" VerticalOptions="Center" />
+                        <Switch Grid.Column="1" x:Name="UseImmichSwitch"
+                                Toggled="OnSourceToggled"
+                                OnColor="#4FC3F7" VerticalOptions="Center" />
+                    </Grid>
+
+                    <!-- Настройки Immich -->
+                    <VerticalStackLayout x:Name="ImmichPanel" Spacing="8" Margin="16,0,0,0">
+                        <Label Text="Адрес сервера" TextColor="White" FontSize="16" />
+                        <Label Text="Можно без http:// — например 192.168.1.10:2283"
+                               TextColor="Gray" FontSize="13" />
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                            <Entry Grid.Column="0" x:Name="ImmichUrlEntry"
+                                   Placeholder="http://192.168.1.10:2283"
+                                   PlaceholderColor="#555555"
+                                   Keyboard="Url"
+                                   TextColor="White"
+                                   BackgroundColor="#1E1E1E"
+                                   FontSize="15"
+                                   HeightRequest="52" />
+                            <Button Grid.Column="1" x:Name="ImmichFindButton"
+                                    Text="Найти"
+                                    Clicked="OnFindImmichServerClicked"
+                                    BackgroundColor="#333333"
+                                    TextColor="White"
+                                    Padding="18,10"
+                                    CornerRadius="8"
+                                    VerticalOptions="Center" />
+                        </Grid>
+
+                        <Label Text="Ключ доступа" TextColor="White" FontSize="16" Margin="0,6,0,0" />
+                        <Label Text="Immich → Account Settings → API Keys → New API Key"
+                               TextColor="Gray" FontSize="13" />
+                        <!-- Путь подставляется в коде: набирать сорок символов пультом — не вариант. -->
+                        <Label x:Name="ImmichKeyFileHintLabel"
+                               TextColor="Gray" FontSize="13" FontAttributes="Italic" />
+                        <Entry x:Name="ImmichApiKeyEntry"
+                               Placeholder="ключ доступа"
+                               PlaceholderColor="#555555"
+                               IsPassword="True"
+                               TextColor="White"
+                               BackgroundColor="#1E1E1E"
+                               FontSize="15"
+                               HeightRequest="52" />
+
+                        <Grid ColumnDefinitions="*,190" Margin="0,6,0,0">
+                            <VerticalStackLayout Grid.Column="0">
+                                <Label Text="Скачивать не больше" TextColor="White" FontSize="16" />
+                                <Label Text="Свой предел: снимков на своём сервере обычно куда больше, чем в общем альбоме"
+                                       TextColor="Gray" FontSize="13" />
+                            </VerticalStackLayout>
+                            <Picker Grid.Column="1" x:Name="ImmichLimitPicker"
+                                    TextColor="White" TitleColor="Gray" BackgroundColor="#1E1E1E"
+                                    VerticalOptions="Center" />
+                        </Grid>
+
+                        <Label Text="Что показывать" TextColor="White" FontSize="16" Margin="0,6,0,0" />
+                        <Label x:Name="ImmichStatusLabel"
+                               Text="Ничего не отмечено — покажем всю библиотеку"
+                               TextColor="Gray" FontSize="13"
+                               LineBreakMode="TailTruncation" MaxLines="2" />
+
+                        <!--
+                            Список альбомов с отметками, а не выпадающий список: альбомов
+                            выбирают сразу несколько — «Отпуск» вместе с «Детьми», но без
+                            сканов документов, — а Picker позволяет отметить лишь один.
+                            Строки появляются после запроса к серверу.
+                        -->
+                        <VerticalStackLayout x:Name="ImmichAlbumList" Spacing="6" Margin="0,4,0,0" />
+
+                        <Button x:Name="ImmichAlbumsButton"
+                                Text="Проверить связь и получить альбомы"
+                                Clicked="OnLoadImmichAlbumsClicked"
+                                BackgroundColor="#333333"
+                                TextColor="White"
+                                Padding="18,10"
+                                CornerRadius="8"
+                                HorizontalOptions="Start" />
+
+                        <Label Text="Видео и живые фото берутся по тем же двум переключателям, что и у альбома."
+                               TextColor="Gray" FontSize="13" />
+                    </VerticalStackLayout>
+
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Label Grid.Column="0" Text="Папки на устройстве"
+                               TextColor="White" FontSize="16" VerticalOptions="Center" />
+                        <Switch Grid.Column="1" x:Name="UseLocalFoldersSwitch"
+                                Toggled="OnSourceToggled"
+                                OnColor="#4FC3F7" VerticalOptions="Center" />
+                    </Grid>
+
+                    <!-- Настройки локальных папок -->
+                    <VerticalStackLayout x:Name="LocalFolderPanel" Spacing="8" Margin="16,0,0,0">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+                            <VerticalStackLayout Grid.Column="0" Spacing="2">
+                                <Label x:Name="SelectedFoldersLabel"
+                                       TextColor="White" FontSize="16" />
+                                <Label x:Name="SelectedFoldersDetailLabel"
+                                       TextColor="Gray" FontSize="13"
+                                       LineBreakMode="TailTruncation" MaxLines="3" />
+                            </VerticalStackLayout>
+
+                            <Button Grid.Column="1"
+                                    Text="Выбрать папки…"
+                                    Clicked="OnPickFoldersClicked"
+                                    BackgroundColor="#333333"
+                                    TextColor="White"
+                                    Padding="18,10"
+                                    CornerRadius="8"
+                                    VerticalOptions="Center" />
+                        </Grid>
+
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Label Grid.Column="0" Text="Включая вложенные папки"
+                                   TextColor="White" FontSize="16" VerticalOptions="Center" />
+                            <Switch Grid.Column="1" x:Name="RecursiveSwitch"
+                                    OnColor="#4FC3F7" VerticalOptions="Center" />
+                        </Grid>
+                    </VerticalStackLayout>
+
+                    <!--
+                        Общее для сетевых источников. Раньше эти два переключателя стояли
+                        внутри настроек альбома Google, но теперь распространяются и на
+                        Immich: при выключенном альбоме панель скрыта, и добраться до них
+                        было нельзя вовсе.
+                    -->
+                    <Label Text="Видео и живые фото — из альбома и из Immich"
+                           TextColor="Gray" FontSize="13" Margin="0,10,0,0" />
+
+                    <Grid ColumnDefinitions="*,Auto" Margin="0,6,0,0">
+                        <VerticalStackLayout Grid.Column="0">
+                            <Label Text="Скачивать видео" TextColor="White" FontSize="16" />
+                            <Label Text="Из альбома и из Immich. Видео весят куда больше снимков; выключено — они не показываются"
+                                   TextColor="Gray" FontSize="13" />
+                        </VerticalStackLayout>
+                        <Switch Grid.Column="1" x:Name="AlbumVideosSwitch"
+                                OnColor="#4FC3F7" VerticalOptions="Center" />
+                    </Grid>
+
+                    <Grid ColumnDefinitions="*,Auto" Margin="0,6,0,0">
+                        <VerticalStackLayout Grid.Column="0">
+                            <Label Text="Оживлять живые фото" TextColor="White" FontSize="16" />
+                            <Label Text="Из альбома и из Immich (снятые на iPhone). Клип играется один раз, дальше кадр остаётся снимком"
+                                   TextColor="Gray" FontSize="13" />
+                        </VerticalStackLayout>
+                        <Switch Grid.Column="1" x:Name="MotionPhotosSwitch"
+                                OnColor="#4FC3F7" VerticalOptions="Center" />
+                    </Grid>
+
+                    <!-- Сюда же переехала проверка обновлений: она про источники, а не про показ. -->
+                    <Grid ColumnDefinitions="*,180" Margin="0,10,0,0">
+                        <VerticalStackLayout Grid.Column="0">
+                            <Label Text="Проверять серверы" TextColor="White" FontSize="16" />
+                            <Label Text="Как часто искать новые снимки в альбоме и Immich. Если ничего не изменилось, загрузки не будет"
+                                   TextColor="Gray" FontSize="13" />
+                        </VerticalStackLayout>
+                        <Picker Grid.Column="1" x:Name="PollIntervalPicker"
+                                TextColor="White" TitleColor="Gray" BackgroundColor="#1E1E1E"
+                                VerticalOptions="Center" />
+                    </Grid>
+                </VerticalStackLayout>
+
+                <!-- ================= Слайд-шоу ================= -->
+                <Border BackgroundColor="#1E1E1E" StrokeThickness="0" Padding="16,12">
+                    <Border.StrokeShape>
+                        <RoundRectangle CornerRadius="8" />
+                    </Border.StrokeShape>
+                    <Border.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnSectionHeaderTapped"
+                                              CommandParameter="{x:Reference SlideshowSection}" />
+                    </Border.GestureRecognizers>
+                    <VerticalStackLayout Spacing="2">
+                        <Label Text="▸  СЛАЙД-ШОУ"
+                               TextColor="#4FC3F7"
+                               FontSize="14"
+                               FontAttributes="Bold"
+                               CharacterSpacing="2"
+                               HorizontalOptions="Start" />
+                        <Label Text="Как часто сменяются кадры и в каком порядке"
+                               TextColor="Gray" FontSize="12" HorizontalOptions="Start" />
+                    </VerticalStackLayout>
+                </Border>
+
+                <VerticalStackLayout x:Name="SlideshowSection" IsVisible="False"
+                                     Spacing="20" Margin="8,6,0,10">
+
+                    <Grid ColumnDefinitions="*,180">
+                        <Label Grid.Column="0" Text="Показывать кадр"
+                               TextColor="White" FontSize="16" VerticalOptions="Center" />
+                        <Picker Grid.Column="1" x:Name="SlideshowIntervalPicker"
+                                TextColor="White" TitleColor="Gray" BackgroundColor="#1E1E1E" />
+                    </Grid>
+
+                    <Grid ColumnDefinitions="*,Auto">
+                        <VerticalStackLayout Grid.Column="0">
+                            <Label Text="Случайный порядок" TextColor="White" FontSize="16" />
+                            <Label Text="Переключение пересобирает очередь сразу; дальше порядок держится, пока набор не изменился, и переживает перезапуск"
+                                   TextColor="Gray" FontSize="13" />
+                        </VerticalStackLayout>
+                        <Switch Grid.Column="1" x:Name="ShuffleSwitch"
+                                OnColor="#4FC3F7" VerticalOptions="Center" />
+                    </Grid>
+                </VerticalStackLayout>
+
+                <!-- ================= Экран ================= -->
+                <Border BackgroundColor="#1E1E1E" StrokeThickness="0" Padding="16,12">
+                    <Border.StrokeShape>
+                        <RoundRectangle CornerRadius="8" />
+                    </Border.StrokeShape>
+                    <Border.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnSectionHeaderTapped"
+                                              CommandParameter="{x:Reference ScreenSection}" />
+                    </Border.GestureRecognizers>
+                    <VerticalStackLayout Spacing="2">
+                        <Label Text="▸  ЭКРАН"
+                               TextColor="#4FC3F7"
+                               FontSize="14"
+                               FontAttributes="Bold"
+                               CharacterSpacing="2"
+                               HorizontalOptions="Start" />
+                        <Label Text="Яркость и размер кадра"
+                               TextColor="Gray" FontSize="12" HorizontalOptions="Start" />
+                    </VerticalStackLayout>
+                </Border>
+
+                <VerticalStackLayout x:Name="ScreenSection" IsVisible="False"
+                                     Spacing="20" Margin="8,6,0,10">
+
+                    <!--
+                        Дневная яркость: у рамки нет ни своей кнопки, ни автоматики
+                        (датчик освещённости в прошивке заявлен, но показаний не даёт),
+                        поэтому подсветку задаёт приложение. То же значение меняется
+                        взмахом вверх-вниз прямо на кадре.
+                    -->
+                    <VerticalStackLayout Spacing="2">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Label Grid.Column="0" Text="Яркость экрана днём"
+                                   TextColor="White" FontSize="16" />
+                            <Label Grid.Column="1" x:Name="DayBrightnessValueLabel"
+                                   TextColor="#4FC3F7" FontSize="16" />
+                        </Grid>
+                        <Label Text="0 — не трогать подсветку. Меняется и взмахом вверх-вниз по кадру"
+                               TextColor="Gray" FontSize="13" />
+                        <Slider x:Name="DayBrightnessSlider"
+                                Minimum="0" Maximum="100"
+                                ValueChanged="OnDayBrightnessChanged"
+                                MinimumTrackColor="#4FC3F7" MaximumTrackColor="#333333"
+                                ThumbColor="#4FC3F7" />
+                    </VerticalStackLayout>
+
+                    <Grid ColumnDefinitions="*,Auto">
+                        <VerticalStackLayout Grid.Column="0">
+                            <Label Text="Растягивать на весь экран" TextColor="White" FontSize="16" />
+                            <Label Text="Обрезает края. Выключено — кадр целиком"
+                                   TextColor="Gray" FontSize="13" />
+                        </VerticalStackLayout>
+                        <Switch Grid.Column="1" x:Name="FillScreenSwitch"
+                                OnColor="#4FC3F7" VerticalOptions="Center" />
+                    </Grid>
+                </VerticalStackLayout>
+
+                <!-- ================= Часы и подписи ================= -->
+                <Border BackgroundColor="#1E1E1E" StrokeThickness="0" Padding="16,12">
+                    <Border.StrokeShape>
+                        <RoundRectangle CornerRadius="8" />
+                    </Border.StrokeShape>
+                    <Border.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnSectionHeaderTapped"
+                                              CommandParameter="{x:Reference CaptionsSection}" />
+                    </Border.GestureRecognizers>
+                    <VerticalStackLayout Spacing="2">
+                        <Label Text="▸  ЧАСЫ И ПОДПИСИ"
+                               TextColor="#4FC3F7"
+                               FontSize="14"
+                               FontAttributes="Bold"
+                               CharacterSpacing="2"
+                               HorizontalOptions="Start" />
+                        <Label Text="Что показывать поверх снимка"
+                               TextColor="Gray" FontSize="12" HorizontalOptions="Start" />
+                    </VerticalStackLayout>
+                </Border>
+
+                <VerticalStackLayout x:Name="CaptionsSection" IsVisible="False"
+                                     Spacing="20" Margin="8,6,0,10">
+
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Label Grid.Column="0" Text="Часы поверх снимка"
+                               TextColor="White" FontSize="16" VerticalOptions="Center" />
+                        <Switch Grid.Column="1" x:Name="ShowClockSwitch"
+                                OnColor="#4FC3F7" VerticalOptions="Center" />
+                    </Grid>
+
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Label Grid.Column="0" Text="Дата под часами"
+                               TextColor="White" FontSize="16" VerticalOptions="Center" />
+                        <Switch Grid.Column="1" x:Name="ShowDateSwitch"
+                                OnColor="#4FC3F7" VerticalOptions="Center" />
+                    </Grid>
+
+                    <Grid ColumnDefinitions="*,Auto">
+                        <VerticalStackLayout Grid.Column="0">
+                            <Label Text="Чем и когда снят кадр" TextColor="White" FontSize="16" />
+                            <Label Text="Из EXIF; у пересжатых Google снимков обычно отсутствует"
+                                   TextColor="Gray" FontSize="13" />
+                        </VerticalStackLayout>
+                        <Switch Grid.Column="1" x:Name="ShowCaptureInfoSwitch"
+                                OnColor="#4FC3F7" VerticalOptions="Center" />
+                    </Grid>
+
+                    <Grid ColumnDefinitions="*,180">
+                        <VerticalStackLayout Grid.Column="0">
+                            <Label Text="Скрывать панель через" TextColor="White" FontSize="16" />
+                            <Label Text="Кнопки и подпись кадра появляются по касанию экрана"
+                                   TextColor="Gray" FontSize="13" />
+                        </VerticalStackLayout>
+                        <Picker Grid.Column="1" x:Name="PanelRevealPicker"
+                                TextColor="White" TitleColor="Gray" BackgroundColor="#1E1E1E"
+                                VerticalOptions="Center" />
+                    </Grid>
+                </VerticalStackLayout>
+
+                <!-- ================= Ночной режим ================= -->
+                <Border BackgroundColor="#1E1E1E" StrokeThickness="0" Padding="16,12">
+                    <Border.StrokeShape>
+                        <RoundRectangle CornerRadius="8" />
+                    </Border.StrokeShape>
+                    <Border.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnSectionHeaderTapped"
+                                              CommandParameter="{x:Reference NightSection}" />
+                    </Border.GestureRecognizers>
+                    <VerticalStackLayout Spacing="2">
+                        <Label Text="▸  НОЧНОЙ РЕЖИМ"
+                               TextColor="#4FC3F7"
+                               FontSize="14"
+                               FontAttributes="Bold"
+                               CharacterSpacing="2"
+                               HorizontalOptions="Start" />
+                        <Label Text="Часы на чёрном: интервал, цвет, яркость"
+                               TextColor="Gray" FontSize="12" HorizontalOptions="Start" />
+                    </VerticalStackLayout>
+                </Border>
+
+                <VerticalStackLayout x:Name="NightSection" IsVisible="False"
+                                     Spacing="20" Margin="8,6,0,10">
+
+                    <Grid ColumnDefinitions="*,Auto">
+                        <VerticalStackLayout Grid.Column="0">
+                            <Label Text="Ночью показывать часы вместо снимков" TextColor="White" FontSize="16" />
+                            <Label Text="Крупные приглушённые часы на чёрном фоне" TextColor="Gray" FontSize="13" />
+                        </VerticalStackLayout>
+                        <Switch Grid.Column="1" x:Name="NightModeSwitch"
+                                OnColor="#4FC3F7" VerticalOptions="Center" />
+                    </Grid>
+
+                    <Grid ColumnDefinitions="*,150,Auto,150" ColumnSpacing="12">
+                        <Label Grid.Column="0" Text="Интервал"
+                               TextColor="White" FontSize="16" VerticalOptions="Center" />
+                        <Picker Grid.Column="1" x:Name="NightStartPicker"
+                                TextColor="White" TitleColor="Gray" BackgroundColor="#1E1E1E" />
+                        <Label Grid.Column="2" Text="—"
+                               TextColor="Gray" FontSize="16" VerticalOptions="Center" />
+                        <Picker Grid.Column="3" x:Name="NightEndPicker"
+                                TextColor="White" TitleColor="Gray" BackgroundColor="#1E1E1E" />
+                    </Grid>
+
+                    <Grid ColumnDefinitions="*,220" ColumnSpacing="12">
+                        <VerticalStackLayout Grid.Column="0">
+                            <Label Text="Цвет ночных часов" TextColor="White" FontSize="16" />
+                            <Label Text="Оттенки подобраны так, чтобы читаться на чёрном"
+                                   TextColor="Gray" FontSize="13" />
+                        </VerticalStackLayout>
+                        <Picker Grid.Column="1" x:Name="NightColorPicker"
+                                TextColor="White" TitleColor="Gray" BackgroundColor="#1E1E1E"
+                                VerticalOptions="Center" />
+                    </Grid>
+
+                    <!--
+                        Две отдельные шкалы, а не одна: подсветка упирается в предел
+                        устройства (около 8%), и дальше гасить можно только краской.
+                        Ползунок, а не список: нужное значение подбирают на глаз, глядя
+                        на сами часы.
+                    -->
+                    <VerticalStackLayout Spacing="2">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Label Grid.Column="0" Text="Яркость экрана ночью"
+                                   TextColor="White" FontSize="16" />
+                            <Label Grid.Column="1" x:Name="NightBrightnessValueLabel"
+                                   TextColor="#4FC3F7" FontSize="16" />
+                        </Grid>
+                        <Label Text="0 — не трогать подсветку; ниже своего предела она не опускается"
+                               TextColor="Gray" FontSize="13" />
+                        <Slider x:Name="NightBrightnessSlider"
+                                Minimum="0" Maximum="100"
+                                ValueChanged="OnNightBrightnessChanged"
+                                MinimumTrackColor="#4FC3F7" MaximumTrackColor="#333333"
+                                ThumbColor="#4FC3F7" />
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout Spacing="2">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Label Grid.Column="0" Text="Насыщенность цифр ночью"
+                                   TextColor="White" FontSize="16" />
+                            <Label Grid.Column="1" x:Name="NightIntensityValueLabel"
+                                   TextColor="#4FC3F7" FontSize="16" />
+                        </Grid>
+                        <Label Text="Сами цифры: этим их гасят, когда подсветка уже на пределе. Ночью тем же взмахом вверх-вниз"
+                               TextColor="Gray" FontSize="13" />
+                        <Slider x:Name="NightIntensitySlider"
+                                Minimum="1" Maximum="100"
+                                ValueChanged="OnNightIntensityChanged"
+                                MinimumTrackColor="#4FC3F7" MaximumTrackColor="#333333"
+                                ThumbColor="#4FC3F7" />
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+
+                <!-- ================= Home Assistant ================= -->
+                <Border BackgroundColor="#1E1E1E" StrokeThickness="0" Padding="16,12">
+                    <Border.StrokeShape>
+                        <RoundRectangle CornerRadius="8" />
+                    </Border.StrokeShape>
+                    <Border.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnSectionHeaderTapped"
+                                              CommandParameter="{x:Reference HomeAssistantSection}" />
+                    </Border.GestureRecognizers>
+                    <VerticalStackLayout Spacing="2">
+                        <Label Text="▸  HOME ASSISTANT"
+                               TextColor="#4FC3F7"
+                               FontSize="14"
+                               FontAttributes="Bold"
+                               CharacterSpacing="2"
+                               HorizontalOptions="Start" />
+                        <Label Text="Подключение и датчики"
+                               TextColor="Gray" FontSize="12" HorizontalOptions="Start" />
+                    </VerticalStackLayout>
+                </Border>
+
+                <VerticalStackLayout x:Name="HomeAssistantSection" IsVisible="False"
+                                     Spacing="20" Margin="8,6,0,10">
+
+                    <VerticalStackLayout Spacing="8">
+                        <Label Text="Адрес Home Assistant" TextColor="White" FontSize="16" />
+                        <Label Text="Внутренний адрес, без интернета — например homeassistant.local:8123"
+                               TextColor="Gray" FontSize="13" />
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                            <Entry Grid.Column="0" x:Name="HomeAssistantUrlEntry"
+                                   Placeholder="http://homeassistant.local:8123"
+                                   PlaceholderColor="#555555"
+                                   Keyboard="Url"
+                                   TextColor="White"
+                                   BackgroundColor="#1E1E1E"
+                                   FontSize="15"
+                                   HeightRequest="52" />
+                            <Button Grid.Column="1" x:Name="HomeAssistantFindButton"
+                                    Text="Найти"
+                                    Clicked="OnFindHomeAssistantServerClicked"
+                                    BackgroundColor="#333333"
+                                    TextColor="White"
+                                    Padding="18,10"
+                                    CornerRadius="8"
+                                    VerticalOptions="Center" />
+                        </Grid>
+
+                        <Label Text="Токен доступа" TextColor="White" FontSize="16" Margin="0,6,0,0" />
+                        <Label Text="В Home Assistant: профиль (внизу боковой панели) → Security → Long-lived access tokens → Create token. Показывается только один раз — скопируйте сразу"
+                               TextColor="Gray" FontSize="13" />
+                        <!-- Путь подставляется в коде: набирать длинный токен пультом — не вариант. -->
+                        <Label x:Name="HomeAssistantKeyFileHintLabel"
+                               TextColor="Gray" FontSize="13" FontAttributes="Italic" />
+                        <Entry x:Name="HomeAssistantTokenEntry"
+                               Placeholder="токен доступа"
+                               PlaceholderColor="#555555"
+                               IsPassword="True"
+                               TextColor="White"
+                               BackgroundColor="#1E1E1E"
+                               FontSize="15"
+                               HeightRequest="52" />
+
+                        <Label x:Name="HomeAssistantStatusLabel"
+                               TextColor="Gray" FontSize="13"
+                               LineBreakMode="WordWrap" MaxLines="2" />
+
+                        <Button x:Name="HomeAssistantTestButton"
+                                Text="Проверить связь"
+                                Clicked="OnTestHomeAssistantClicked"
+                                BackgroundColor="#333333"
+                                TextColor="White"
+                                Padding="18,10"
+                                CornerRadius="8"
+                                HorizontalOptions="Start" />
+                    </VerticalStackLayout>
+
+                    <!-- Датчики — часть Home Assistant, поэтому живут в его же разделе. -->
+                    <Grid ColumnDefinitions="*,Auto">
+                        <VerticalStackLayout Grid.Column="0">
+                            <Label Text="Показывать датчики" TextColor="White" FontSize="16" />
+                            <Label Text="Значения выводятся под датой; ночью входят в кадр часов"
+                                   TextColor="Gray" FontSize="13" />
+                        </VerticalStackLayout>
+                        <Switch Grid.Column="1" x:Name="ShowSensorsSwitch"
+                                Toggled="OnShowSensorsToggled"
+                                OnColor="#4FC3F7" VerticalOptions="Center" />
+                    </Grid>
+
+                    <Grid x:Name="SensorPanel" ColumnDefinitions="*,Auto" ColumnSpacing="16" Margin="16,0,0,0">
+                        <VerticalStackLayout Grid.Column="0" Spacing="2">
+                            <Label x:Name="SelectedSensorsLabel" TextColor="White" FontSize="16" />
+                            <!-- Выбранных датчиков может быть много, поэтому под перечень отдано три строки. -->
+                            <Label x:Name="SelectedSensorsDetailLabel" TextColor="Gray" FontSize="13"
+                                   LineBreakMode="WordWrap" MaxLines="3" />
+                        </VerticalStackLayout>
+
+                        <Button Grid.Column="1"
+                                Text="Выбрать датчики…"
+                                Clicked="OnPickSensorsClicked"
+                                BackgroundColor="#333333"
+                                TextColor="White"
+                                Padding="18,10"
+                                CornerRadius="8"
+                                VerticalOptions="Center" />
+                    </Grid>
+                </VerticalStackLayout>
+
+                <!-- ================= Камеры ================= -->
+                <Border BackgroundColor="#1E1E1E" StrokeThickness="0" Padding="16,12">
+                    <Border.StrokeShape>
+                        <RoundRectangle CornerRadius="8" />
+                    </Border.StrokeShape>
+                    <Border.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnSectionHeaderTapped"
+                                              CommandParameter="{x:Reference CamerasSection}" />
+                    </Border.GestureRecognizers>
+                    <VerticalStackLayout Spacing="2">
+                        <Label Text="▸  КАМЕРЫ"
+                               TextColor="#4FC3F7"
+                               FontSize="14"
+                               FontAttributes="Bold"
+                               CharacterSpacing="2"
+                               HorizontalOptions="Start" />
+                        <Label Text="Снимки из Home Assistant и прямой RTSP-поток"
+                               TextColor="Gray" FontSize="12" HorizontalOptions="Start" />
+                    </VerticalStackLayout>
+                </Border>
+
+                <VerticalStackLayout x:Name="CamerasSection" IsVisible="False"
+                                     Spacing="20" Margin="8,6,0,10">
+
+                    <Grid ColumnDefinitions="*,190">
+                        <VerticalStackLayout Grid.Column="0">
+                            <Label Text="Обновлять снимок камеры" TextColor="White" FontSize="16" />
+                            <Label Text="Реже — меньше нагрузка на камеру и на Home Assistant; некоторые камеры щёлкают затвором на каждый запрос"
+                                   TextColor="Gray" FontSize="13" />
+                        </VerticalStackLayout>
+                        <Picker Grid.Column="1" x:Name="CameraSnapshotIntervalPicker"
+                                TextColor="White" TitleColor="Gray" BackgroundColor="#1E1E1E"
+                                VerticalOptions="Center" />
+                    </Grid>
+
+                    <!--
+                        Прямой RTSP-источник IP-камеры: рамка играет сам поток, минуя
+                        перекодировку Home Assistant. Полезно, когда HA-поток нестабилен.
+                    -->
+                    <VerticalStackLayout Spacing="8">
+                        <Label Text="IP-камера напрямую (RTSP)" TextColor="White" FontSize="16" />
+                        <Label Text="Прямой поток минует перекодировку Home Assistant, которая на нестабильной камере и рвётся"
+                               TextColor="Gray" FontSize="13" />
+                        <!-- Пути подставляются в коде: они зависят от устройства. -->
+                        <Label x:Name="CameraRtspFileHintLabel"
+                               TextColor="Gray" FontSize="13" FontAttributes="Italic" />
+                        <Entry x:Name="CameraRtspUrlEntry"
+                               Placeholder="rtsp://user:пароль@192.168.1.50:554/stream1"
+                               PlaceholderColor="#555555"
+                               Keyboard="Url"
+                               TextColor="White"
+                               BackgroundColor="#1E1E1E"
+                               FontSize="15"
+                               HeightRequest="52" />
+                        <Label Text="Название камеры (необязательно)" TextColor="White" FontSize="16" Margin="0,6,0,0" />
+                        <Entry x:Name="CameraRtspNameEntry"
+                               Placeholder="Например: Камера во дворе"
+                               PlaceholderColor="#555555"
+                               TextColor="White"
+                               BackgroundColor="#1E1E1E"
+                               FontSize="15"
+                               HeightRequest="52" />
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+
+                <!-- ================= Запуск ================= -->
+                <Border BackgroundColor="#1E1E1E" StrokeThickness="0" Padding="16,12">
+                    <Border.StrokeShape>
+                        <RoundRectangle CornerRadius="8" />
+                    </Border.StrokeShape>
+                    <Border.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnSectionHeaderTapped"
+                                              CommandParameter="{x:Reference LaunchSection}" />
+                    </Border.GestureRecognizers>
+                    <VerticalStackLayout Spacing="2">
+                        <Label Text="▸  ЗАПУСК"
+                               TextColor="#4FC3F7"
+                               FontSize="14"
+                               FontAttributes="Bold"
+                               CharacterSpacing="2"
+                               HorizontalOptions="Start" />
+                        <Label Text="Автозапуск при включении и тех.режим"
+                               TextColor="Gray" FontSize="12" HorizontalOptions="Start" />
+                    </VerticalStackLayout>
+                </Border>
+
+                <VerticalStackLayout x:Name="LaunchSection" IsVisible="False"
+                                     Spacing="20" Margin="8,6,0,10">
+
+                    <Grid ColumnDefinitions="*,Auto">
+                        <VerticalStackLayout Grid.Column="0">
+                            <Label Text="Открывать слайд-шоу при включении рамки" TextColor="White" FontSize="16" />
+                            <Label Text="Иначе после включения рамка остаётся на лаунчере"
+                                   TextColor="Gray" FontSize="13" />
+                        </VerticalStackLayout>
+                        <Switch Grid.Column="1" x:Name="LaunchOnBootSwitch"
+                                Toggled="OnLaunchOnBootToggled"
+                                OnColor="#4FC3F7" VerticalOptions="Center" />
+                    </Grid>
+
+                    <Grid x:Name="LaunchDelayPanel" ColumnDefinitions="*,220" ColumnSpacing="12"
+                          Margin="16,0,0,0">
+                        <VerticalStackLayout Grid.Column="0">
+                            <Label Text="Задержка запуска" TextColor="White" FontSize="16" />
+                            <Label Text="Сразу после загрузки лаунчер перекрывает чужие окна"
+                                   TextColor="Gray" FontSize="13" />
+                        </VerticalStackLayout>
+                        <Picker Grid.Column="1" x:Name="LaunchDelayPicker"
+                                TextColor="White" TitleColor="Gray" BackgroundColor="#1E1E1E"
+                                VerticalOptions="Center" />
+                    </Grid>
+
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" Margin="16,0,0,0">
+                        <VerticalStackLayout Grid.Column="0">
+                            <Label Text="Тех.режим (настройка adb)" TextColor="White" FontSize="16" />
+                            <Label Text="Выключает автозапуск и показывает шаги, как подтвердить разрешение отладки"
+                                   TextColor="Gray" FontSize="13" />
+                        </VerticalStackLayout>
+                        <Button Grid.Column="1" x:Name="TechModeButton"
+                                Text="Включить"
+                                Clicked="OnTechModeClicked"
+                                BackgroundColor="#333333"
+                                TextColor="White"
+                                FontSize="14"
+                                Padding="16,10"
+                                CornerRadius="8"
+                                VerticalOptions="Center" />
+                    </Grid>
+                </VerticalStackLayout>
+
+                <!-- ================= О программе ================= -->
+                <Border BackgroundColor="#1E1E1E" StrokeThickness="0" Padding="16,12">
+                    <Border.StrokeShape>
+                        <RoundRectangle CornerRadius="8" />
+                    </Border.StrokeShape>
+                    <Border.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnSectionHeaderTapped"
+                                              CommandParameter="{x:Reference AboutSection}" />
+                    </Border.GestureRecognizers>
+                    <VerticalStackLayout Spacing="2">
+                        <Label Text="▸  О ПРОГРАММЕ"
+                               TextColor="#4FC3F7"
+                               FontSize="14"
+                               FontAttributes="Bold"
+                               CharacterSpacing="2"
+                               HorizontalOptions="Start" />
+                        <Label Text="Кадры, место, корзина, версия"
+                               TextColor="Gray" FontSize="12" HorizontalOptions="Start" />
+                    </VerticalStackLayout>
+                </Border>
+
+                <VerticalStackLayout x:Name="AboutSection" IsVisible="False"
+                                     Spacing="6" Margin="8,6,0,10">
+                    <Label x:Name="PhotoCountLabel" TextColor="LightGray" FontSize="14" />
+                    <Label x:Name="LastSyncLabel" TextColor="LightGray" FontSize="14" />
+                    <Label x:Name="StorageLabel" TextColor="LightGray" FontSize="14" />
+                    <Label x:Name="CacheSizeLabel" TextColor="LightGray" FontSize="14" />
+
+                    <!--
+                        Корзину никто не разбирает: рамка стоит на полке, и файлы в ней
+                        копятся годами. Счётчик показывает, сколько там накопилось, а
+                        кнопка позволяет освободить место, не подключая рамку к компьютеру.
+                    -->
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16" Margin="0,4,0,0">
+                        <Label Grid.Column="0" x:Name="TrashLabel"
+                               TextColor="LightGray" FontSize="14" VerticalOptions="Center" />
+
+                        <Button Grid.Column="1" x:Name="EmptyTrashButton"
+                                Text="Очистить"
+                                Clicked="OnEmptyTrashClicked"
+                                BackgroundColor="#333333"
+                                TextColor="White"
+                                FontSize="14"
+                                Padding="16,8"
+                                CornerRadius="8" />
+                    </Grid>
+
+                    <Label x:Name="VersionLabel" TextColor="Gray" FontSize="13" />
+                </VerticalStackLayout>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- Кнопки действий -->
+        <Grid Grid.Row="2" ColumnDefinitions="*,*" ColumnSpacing="16" Padding="24,16" BackgroundColor="#1E1E1E">
+            <Button Grid.Column="0"
+                    Text="Сохранить и обновить"
+                    Clicked="OnSaveClicked"
+                    BackgroundColor="#4FC3F7"
+                    TextColor="Black"
+                    FontAttributes="Bold"
+                    HeightRequest="54"
+                    CornerRadius="10" />
+            <Button Grid.Column="1"
+                    Text="Сохранить"
+                    Clicked="OnSaveOnlyClicked"
+                    BackgroundColor="#333333"
+                    TextColor="White"
+                    HeightRequest="54"
+                    CornerRadius="10" />
+        </Grid>
+    </Grid>
+</ContentPage>
